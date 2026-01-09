@@ -2,16 +2,25 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
+import { useState, Suspense, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 
 function SignInForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { status } = useSession();
     const returnUrl = searchParams.get("returnUrl") || "/";
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (status === "authenticated") {
+            router.replace(returnUrl);
+        }
+    }, [status, router, returnUrl]);
+
+    if (status === "authenticated") return null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();

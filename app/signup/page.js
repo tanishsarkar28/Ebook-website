@@ -3,14 +3,24 @@
 import { useStore } from "@/context/StoreContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 
 export default function SignUp() {
     const { login } = useStore();
     const router = useRouter();
+    const { status } = useSession();
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (status === "authenticated") {
+            router.replace("/");
+        }
+    }, [status, router]);
+
+    if (status === "authenticated") return null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
