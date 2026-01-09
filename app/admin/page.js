@@ -606,8 +606,11 @@ export default function AdminPage() {
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
                                                     fontSize: '0.6rem',
-                                                    overflow: 'hidden'
+                                                    overflow: 'hidden',
+                                                    color: 'rgba(255,255,255,0.8)',
+                                                    textShadow: '0 1px 2px rgba(0,0,0,0.5)'
                                                 }}>
+                                                    {!(book.image || book.coverImage) && "No Image"}
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.2rem' }}>{book.title}</div>
