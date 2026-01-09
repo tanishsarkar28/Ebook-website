@@ -51,9 +51,9 @@ export default function BookDetails() {
         <div className="container">
             <div className="book-details">
                 <div className="details-cover-wrapper">
-                    {book.coverImage ? (
+                    {(book.image || book.coverImage) ? (
                         <img
-                            src={book.coverImage}
+                            src={book.image || book.coverImage}
                             alt={book.title}
                             className="details-cover"
                             style={{ objectFit: 'contain' }}

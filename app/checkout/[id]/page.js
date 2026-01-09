@@ -135,7 +135,7 @@ export default function CheckoutPage() {
                         <div className="book-preview-card">
                             <div className="book-cover-art"
                                 style={{
-                                    background: book.coverImage ? `url(${book.coverImage}) center/cover no-repeat` : book.gradient
+                                    background: (book.image || book.coverImage) ? `url(${book.image || book.coverImage}) center/cover no-repeat` : book.gradient
                                 }}>
                             </div>
                             <div className="book-info">

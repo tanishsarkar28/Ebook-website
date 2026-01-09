@@ -5,10 +5,10 @@ export default function BookCard({ book }) {
         <Link href={`/books/${book.id}`} className="book-card-link">
             <div className="book-card glass-panel">
                 <div className="book-cover" style={{
-                    background: book.coverImage ? `url(${book.coverImage}) center/cover no-repeat` : book.gradient,
+                    background: (book.image || book.coverImage) ? `url(${book.image || book.coverImage}) center/cover no-repeat` : book.gradient,
                     position: 'relative'
                 }}>
-                    {!book.coverImage && <div className="book-spine"></div>}
+                    {!(book.image || book.coverImage) && <div className="book-spine"></div>}
                     <span className="book-badge">New</span>
                 </div>
                 <div className="book-info">

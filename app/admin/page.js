@@ -601,7 +601,7 @@ export default function AdminPage() {
                                                     width: '60px',
                                                     height: '80px',
                                                     borderRadius: '4px',
-                                                    background: book.coverImage ? `url(${book.coverImage}) center/cover no-repeat` : book.gradient,
+                                                    background: (book.image || book.coverImage) ? `url(${book.image || book.coverImage}) center/cover no-repeat` : book.gradient,
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
