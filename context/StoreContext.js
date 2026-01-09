@@ -9,7 +9,7 @@ import { books as FALLBACK_BOOKS } from "@/lib/books";
 const StoreContext = createContext();
 
 export function StoreProvider({ children }) {
-    const { data: session, status } = useSession();
+    const { data: session, status, update: updateSession } = useSession();
     const { showToast } = useToast();
     const [user, setUser] = useState(null);
     const [purchasedBooks, setPurchasedBooks] = useState([]);
@@ -167,8 +167,11 @@ export function StoreProvider({ children }) {
 
     const hasPurchased = (bookId) => purchasedBooks.includes(bookId);
 
-    const updateUser = (updatedData) => {
+    const updateUser = async (updatedData) => {
         setUser(prev => ({ ...prev, ...updatedData }));
+        if (updatedData.name) {
+            await updateSession({ name: updatedData.name });
+        }
     };
 
     const [pendingOrders, setPendingOrders] = useState([]);

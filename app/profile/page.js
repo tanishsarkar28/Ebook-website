@@ -22,21 +22,37 @@ export default function ProfilePage() {
         }
     }, [user, router]);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
 
-        setTimeout(() => {
-            updateUser({ name });
-            setIsLoading(false);
+        try {
+            const res = await fetch("/api/user", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, password }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || "Failed to update profile");
+
+            updateUser(data.user); // Update local context
             setIsSaved(true);
-            setTimeout(() => setIsSaved(false), 2000);
+            showToast("Profile updated successfully!", "success");
+
             if (password) {
-                // Mock password update
-                showToast("Password updated successfully!", "success");
-                setPassword("");
+                setPassword(""); // Clear password field after success
             }
-        }, 800);
+
+            setTimeout(() => setIsSaved(false), 3000);
+
+        } catch (error) {
+            console.error(error);
+            showToast(error.message, "error");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (!user) return <div className="container" style={{ paddingTop: '8rem', textAlign: 'center' }}>Please sign in.</div>;
