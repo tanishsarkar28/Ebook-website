@@ -1,49 +1,37 @@
 "use client";
 
 import { useStore } from "@/context/StoreContext";
-import { books } from "@/lib/books";
 import BookCard from "@/components/BookCard";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function LibraryPage() {
-    const { user, hasPurchased, pendingOrders } = useStore();
+    const { user, availableBooks, hasPurchased, pendingOrders } = useStore();
+    const { status } = useSession();
     const router = useRouter();
-    const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
-        // Simple auth check
-        const checkAuth = () => {
-            // Give a small grace period for context to load
-            setTimeout(() => {
-                if (!localStorage.getItem("user")) {
-                    router.push("/signin?returnUrl=/library");
-                }
-                setIsLoading(false);
-            }, 100);
-        };
+        if (status === "unauthenticated") {
+            router.push("/signin?returnUrl=/library");
+        }
+    }, [status, router]);
 
-        checkAuth();
-    }, [router]);
-
-    if (isLoading) {
+    if (status === "loading" || !user) {
         return <div className="container" style={{ paddingTop: '8rem', textAlign: 'center' }}>Loading Library...</div>;
     }
 
-    if (!user) return null; // Will redirect
-
-    // Filter books that the user has purchased
-    const myBooks = books.filter(book => hasPurchased(book.id));
+    // Filter books from the DYNAMIC availableBooks list, not static
+    const myBooks = availableBooks.filter(book => hasPurchased(book.id));
 
     // Filter books that are pending for this user
-    // We Map pending orders to book objects, but we need to find the book details from 'books' array or use the order details
     const pendingBooks = pendingOrders
         ? pendingOrders
             .filter(o => o.userId === user.email && o.status === 'pending')
             .map(o => {
-                const originalBook = books.find(b => b.id === o.bookId);
+                const originalBook = availableBooks.find(b => b.id === o.bookId);
                 return originalBook ? { ...originalBook, isPending: true } : null;
             })
             .filter(Boolean)
@@ -51,7 +39,7 @@ export default function LibraryPage() {
 
     const allBooks = [...myBooks, ...pendingBooks];
 
-    // Remove duplicates if any (e.g. if logic allows buying pending book again)
+    // Remove duplicates
     const uniqueBooks = Array.from(new Map(allBooks.map(item => [item.id, item])).values());
 
     const filteredBooks = uniqueBooks.filter(book =>
