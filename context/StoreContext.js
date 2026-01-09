@@ -81,13 +81,12 @@ export function StoreProvider({ children }) {
                 return res.json();
             })
             .then(data => {
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data)) {
                     const mappedBooks = data.map(b => ({ ...b, id: b._id }));
                     setAvailableBooks(mappedBooks);
                 } else {
-                    // If API returns empty (no seed?) or error structure, use fallback
-                    console.warn("API returned empty/invalid list. Using fallback.");
-                    setAvailableBooks(FALLBACK_BOOKS);
+                    console.error("API returned invalid data structure");
+                    // Optionally set empty or keep loading state
                 }
             })
             .catch(err => {

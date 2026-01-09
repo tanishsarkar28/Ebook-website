@@ -11,24 +11,8 @@ export async function GET(request) {
         await dbConnect();
         let books = await Book.find({});
 
-        // Auto-Seed if empty
-        if (books.length === 0) {
-            console.log("Seeding database with initial books...");
-            // Remove IDs from initialBooks to let Mongo generate them, or keep them if they are safe strings?
-            // lib/books.js has numeric IDs. Mongo uses ObjectIds.
-            // Let's map them to match schema.
-            const seedData = initialBooks.map(b => ({
-                title: b.title,
-                author: b.author,
-                price: b.price,
-                description: b.description,
-                image: b.image,
-                gradient: b.gradient,
-                contentFile: b.contentFile
-            }));
-
-            books = await Book.insertMany(seedData);
-        }
+        // Auto-Seed removed to allow deleting all books
+        // if (books.length === 0) { ... }
 
         // Return reversed to show newest first? Or just default.
         return NextResponse.json(books);
