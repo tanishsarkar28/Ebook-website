@@ -149,6 +149,15 @@ export function StoreProvider({ children }) {
         }
     };
 
+    const hasPurchased = (bookId) => purchasedBooks.includes(bookId);
+
+    const updateUser = async (updatedData) => {
+        setUser(prev => ({ ...prev, ...updatedData }));
+        if (updatedData.name) {
+            await updateSession({ name: updatedData.name });
+        }
+    };
+
     // User Persistence (Handled by NextAuth Session now)
     // We remove the old localStorage effects for user/purchases/pendingOrders
 
