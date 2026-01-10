@@ -76,34 +76,43 @@ export default function CheckoutPage() {
 
         setUploading(true);
         try {
-            const formData = new FormData();
-            formData.append("file", selectedFile);
+            // 1. Convert Image to Base64
+            const reader = new FileReader();
+            const screenshotBase64 = await new Promise((resolve, reject) => {
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsDataURL(selectedFile);
+            });
 
-            const res = await fetch("/api/upload", {
+            // 2. Create Order Payload
+            const orderData = {
+                userId: user.email,
+                userName: user.name,
+                bookId: book.id,
+                bookTitle: book.title,
+                price: book.price,
+                screenshot: screenshotBase64
+            };
+
+            // 3. Send to API
+            const res = await fetch("/api/orders", {
                 method: "POST",
-                body: formData
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(orderData)
             });
 
             if (res.ok) {
-                const data = await res.json();
-
-                const order = {
-                    userId: user.email,
-                    userName: user.name,
-                    bookId: book.id,
-                    bookTitle: book.title,
-                    price: book.price,
-                    screenshot: data.filepath
-                };
-
-                createOrder(order);
-                showToast("Payment Submitted! High-Fives Incoming! 🙌", "success");
+                // We don't need to manually update StoreContext here, 
+                // because the user will be redirected and data re-fetched/re-synced eventually.
+                // But for immediate feedback, we could... but let's rely on the server.
+                showToast("Payment Submitted! Waiting for Admin Approval. ⏳", "success");
                 router.push("/library");
             } else {
-                showToast("Upload failed. Please try again.", "error");
+                const errorData = await res.json();
+                showToast(errorData.error || "Order failed. Please try again.", "error");
             }
         } catch (error) {
-            console.error("Payment upload error:", error);
+            console.error("Payment submission error:", error);
             showToast("An error occurred.", "error");
         } finally {
             setUploading(false);

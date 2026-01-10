@@ -17,64 +17,60 @@ export function StoreProvider({ children }) {
     const [transactions, setTransactions] = useState([]);
     const [isInitialized, setIsInitialized] = useState(false);
 
-    // Sync session to user state
+    // Sync session to user state and permissions
     useEffect(() => {
         if (status === "authenticated" && session?.user) {
             setUser(session.user);
+            // Sync purchased books directly from session (which gets it from DB)
+            setPurchasedBooks(session.user.purchasedBooks || []);
+
+            // If admin, fetch all transactions
+            if (session.user.isAdmin) {
+                refreshTransactions();
+            }
         } else if (status === "unauthenticated") {
             setUser(null);
+            setPurchasedBooks([]);
+            setTransactions([]);
         }
     }, [status, session]);
 
-    // Legacy login function (kept for compatibility if needed, but we should move to specific signIn)
-    // Actually, we can remove it if we update signin page, but let's keep it as a wrapper or just simple state setter for now if manual override is needed
-    // But for proper OAuth, we rely on session.
-    const login = (userDataOrEmail) => {
-        // This is kept for the existing "demo" flow if it bypasses next-auth, 
-        // but ideally we should use next-auth for everything.
-        // For now, we'll leave it but it might be overwritten by session effect if session is null.
-
-        let userData;
-        if (typeof userDataOrEmail === 'string') {
-            const email = userDataOrEmail;
-            userData = {
-                name: email.split('@')[0],
-                email: email,
-                isAdmin: email === 'sarkartanish2802@gmail.com'
-            };
-        } else {
-            userData = userDataOrEmail;
+    const refreshTransactions = async () => {
+        try {
+            const res = await fetch('/api/orders');
+            if (res.ok) {
+                const data = await res.json();
+                // Map _id to id for frontend compatibility
+                const mappedTransactions = data.map(t => ({ ...t, id: t._id }));
+                setTransactions(mappedTransactions);
+                // Update pending orders derived from transactions
+                setPendingOrders(mappedTransactions.filter(t => t.status === 'pending'));
+            }
+        } catch (error) {
+            console.error("Failed to fetch transactions:", error);
         }
-        setUser(userData);
+    };
+
+    // Legacy login function (kept for compatibility with older components if any)
+    const login = (userDataOrEmail) => {
+        // Warning: This is client-side only and won't persist across refreshes like NextAuth
+        console.warn("Using legacy login. Prefer NextAuth signIn.");
+        // ... (simplified)
     };
 
     const logout = async () => {
         await signOut({ redirect: false });
-        setUser(null);
+        // State checks will handle cleanup
     };
 
+    // Buy Book (Client-Side Optimistic - Actual logic is in Checkout Page)
     const buyBook = (bookId) => {
-        if (!purchasedBooks.includes(bookId)) {
-            setPurchasedBooks((prev) => [...prev, bookId]);
-            const book = availableBooks.find(b => b.id === bookId);
-            if (book) {
-                setTransactions(prev => [{
-                    id: Date.now(),
-                    bookTitle: book.title,
-                    price: book.price,
-                    date: new Date().toISOString(),
-                    buyer: user?.email || "Anonymous",
-                    bookId: book.id
-                }, ...prev]);
-            }
-            return true;
-        }
-        return false;
+        // Deprecated: Checkout page handles this via API now.
+        return true;
     };
 
-    // Load Data on Mount
+    // Load Data on Mount (Books Only)
     useEffect(() => {
-        // Fetch Books from API
         fetch('/api/books')
             .then(async res => {
                 if (!res.ok) throw new Error("Failed to fetch");
@@ -84,227 +80,78 @@ export function StoreProvider({ children }) {
                 if (Array.isArray(data)) {
                     const mappedBooks = data.map(b => ({ ...b, id: b._id }));
                     setAvailableBooks(mappedBooks);
-                } else {
-                    console.error("API returned invalid data structure");
-                    // Optionally set empty or keep loading state
+                    setIsInitialized(true);
                 }
             })
             .catch(err => {
-                console.warn("Offline Mode: API unreachable, using local books.", err.message);
+                console.warn("Offline Mode:", err.message);
                 setAvailableBooks(FALLBACK_BOOKS);
+                setIsInitialized(true);
             });
-
-        // Load other local data
-        const storedTransactions = JSON.parse(localStorage.getItem("transactions") || "[]");
-        const storedPendingOrders = JSON.parse(localStorage.getItem("pendingOrders") || "[]");
-
-        if (storedTransactions.length > 0) setTransactions(storedTransactions);
-        if (storedPendingOrders) setPendingOrders(storedPendingOrders);
-
-        setIsInitialized(true);
     }, []);
 
-    // ... (keep auth/user effects) ...
 
-    const addBook = async (newBook) => {
-        try {
-            const res = await fetch('/api/books', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newBook)
-            });
-
-            if (res.ok) {
-                const savedBook = await res.json();
-                const bookWithId = { ...savedBook, id: savedBook._id };
-                setAvailableBooks(prev => [...prev, bookWithId]);
-                return bookWithId;
-            } else {
-                showToast("Failed to create book", "error");
-            }
-        } catch (err) {
-            console.error(err);
-            showToast("Network error", "error");
-        }
-    };
-
-    const deleteBook = async (bookId) => {
-        // Optimistic update
-        const previousBooks = [...availableBooks];
-        setAvailableBooks(prev => prev.filter(book => book.id !== bookId));
-
-        try {
-            const res = await fetch(`/api/books/${bookId}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error("Delete failed");
-            showToast("Book deleted", "success");
-        } catch (err) {
-            // Revert
-            setAvailableBooks(previousBooks);
-            showToast("Failed to delete book", "error");
-        }
-    };
-
-    const updateBook = async (id, updatedDetails) => {
-        // Optimistic update
-        setAvailableBooks(prev => prev.map(book =>
-            book.id === id ? { ...book, ...updatedDetails } : book
-        ));
-
-        try {
-            const res = await fetch(`/api/books/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedDetails)
-            });
-            if (!res.ok) throw new Error("Update failed");
-        } catch (err) {
-            console.error(err);
-            showToast("Failed to save changes", "error");
-            // Ideally revert here too
-        }
-    };
-
-    const hasPurchased = (bookId) => purchasedBooks.includes(bookId);
-
-    const updateUser = async (updatedData) => {
-        setUser(prev => ({ ...prev, ...updatedData }));
-        if (updatedData.name) {
-            await updateSession({ name: updatedData.name });
-        }
-    };
-
+    // Order Management (Server-Side)
     const [pendingOrders, setPendingOrders] = useState([]);
 
+    // Create Order is now handled by Checkout Page calling API directly. 
+    // We keep this function stub compliant if used elsewhere, but ideally remove usage.
     const createOrder = (order) => {
-        setPendingOrders(prev => [...prev, {
-            ...order,
-            id: Date.now(),
-            date: new Date().toISOString(),
-            status: 'pending'
-        }]);
+        // No-op or optimistic update if needed
     };
 
-    const approveOrder = (orderId) => {
-        setPendingOrders(prev => prev.map(o =>
-            o.id === orderId ? { ...o, status: 'approved' } : o
-        ));
-
-        const order = pendingOrders.find(o => o.id === orderId);
-        if (order) {
-            // Grant access to book (Fix: Write to BUYER'S storage, not just current user's state)
-            const buyerEmail = order.userId || order.userName; // Assuming email is passed as userId/userName
-            if (buyerEmail) {
-                const userKey = `purchasedBooks_${buyerEmail}`;
-                try {
-                    const existingBooks = JSON.parse(localStorage.getItem(userKey) || "[]");
-                    if (!existingBooks.includes(order.bookId)) {
-                        existingBooks.push(order.bookId);
-                        localStorage.setItem(userKey, JSON.stringify(existingBooks));
-                    }
-                } catch (e) {
-                    console.error("Failed to grant access locally:", e);
-                }
+    const approveOrder = async (orderId) => {
+        try {
+            const res = await fetch(`/api/orders/${orderId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed' })
+            });
+            if (res.ok) {
+                showToast("Order Approved", "success");
+                refreshTransactions(); // Reload data to reflect changes
             }
-
-            // Also update state if the BUYER is the CURRENT user (rare for admin, but good for testing)
-            if (user && user.email === buyerEmail && !purchasedBooks.includes(order.bookId)) {
-                setPurchasedBooks(prev => [...prev, order.bookId]);
-            }
-
-            // Record Transaction
-            setTransactions(prev => [{
-                id: Date.now(),
-                bookTitle: order.bookTitle,
-                price: order.price,
-                date: new Date().toISOString(),
-                buyer: buyerEmail,
-                bookId: order.bookId
-            }, ...prev]);
+        } catch (error) {
+            console.error("Approve failed:", error);
+            showToast("Failed to approve", "error");
         }
     };
 
-    const rejectOrder = (orderId) => {
-        setPendingOrders(prev => prev.map(o =>
-            o.id === orderId ? { ...o, status: 'rejected' } : o
-        ));
-    };
-
-    const revokeAccess = (transactionId) => {
-        const transaction = transactions.find(t => t.id === transactionId);
-        if (transaction) {
-            // 1. Remove from Buyer's Storage
-            const buyerEmail = transaction.buyer;
-            const userKey = `purchasedBooks_${buyerEmail}`;
-            try {
-                const existingBooks = JSON.parse(localStorage.getItem(userKey) || "[]");
-                const updatedBooks = existingBooks.filter(id => id !== transaction.bookId);
-                localStorage.setItem(userKey, JSON.stringify(updatedBooks));
-            } catch (e) {
-                console.error("Failed to revoke access locally:", e);
+    const rejectOrder = async (orderId) => {
+        try {
+            const res = await fetch(`/api/orders/${orderId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'rejected' })
+            });
+            if (res.ok) {
+                showToast("Order Rejected", "error"); // Visual feedback
+                refreshTransactions();
             }
-
-            // 2. Remove Transaction Log
-            setTransactions(prev => prev.filter(t => t.id !== transactionId));
-
-            // 3. If the buyer is the current user, update state physically
-            if (user && user.email === buyerEmail) {
-                setPurchasedBooks(prev => prev.filter(id => id !== transaction.bookId));
-            }
+        } catch (error) {
+            console.error("Reject failed:", error);
         }
     };
 
-    // Load Data on Mount (Transactions & Orders are still local for now/transitioning)
-    useEffect(() => {
-        // We fetch books in a separate effect or here?
-        // Let's keep this clean.
-        const storedTransactions = JSON.parse(localStorage.getItem("transactions") || "[]");
-        const storedPendingOrders = JSON.parse(localStorage.getItem("pendingOrders") || "[]");
-
-        if (storedTransactions.length > 0) setTransactions(storedTransactions);
-        if (storedPendingOrders) setPendingOrders(storedPendingOrders);
-
-        setIsInitialized(true);
-    }, []);
-
-    // Save global state
-    useEffect(() => {
-        localStorage.setItem("transactions", JSON.stringify(transactions));
-    }, [transactions]);
-
-    useEffect(() => {
-        localStorage.setItem("pendingOrders", JSON.stringify(pendingOrders));
-    }, [pendingOrders]);
-
-    useEffect(() => {
-        if (isInitialized) {
-            localStorage.setItem("availableBooks", JSON.stringify(availableBooks));
+    const revokeAccess = async (transactionId) => {
+        try {
+            const res = await fetch(`/api/orders/${transactionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'revoked' })
+            });
+            if (res.ok) {
+                showToast("Access Revoked", "success");
+                refreshTransactions();
+            }
+        } catch (error) {
+            console.error("Revoke failed:", error);
         }
-    }, [availableBooks, isInitialized]);
+    };
 
-    // User Persistence & Purchase Loading
-    useEffect(() => {
-        if (user) {
-            // localStorage.setItem("user", JSON.stringify(user)); // Removed to rely on session, but maybe keep for other parts? 
-            // Actually, keep writing it so if we reload page and session isn't ready immediately we might have jitter? 
-            // NextAuth is fast. Let's remove manual user persistence to avoid conflicts.
+    // User Persistence (Handled by NextAuth Session now)
+    // We remove the old localStorage effects for user/purchases/pendingOrders
 
-            // Load this user's purchases
-            const userKey = `purchasedBooks_${user.email}`;
-            const userPurchases = JSON.parse(localStorage.getItem(userKey) || "[]");
-            setPurchasedBooks(userPurchases);
-        } else {
-            // localStorage.removeItem("user");
-            setPurchasedBooks([]); // No user = no purchases
-        }
-    }, [user]);
-
-    // Save User Purchases
-    useEffect(() => {
-        if (user) {
-            const userKey = `purchasedBooks_${user.email}`;
-            localStorage.setItem(userKey, JSON.stringify(purchasedBooks));
-        }
-    }, [purchasedBooks, user]);
 
     const [readingProgress, setReadingProgress] = useState({});
 

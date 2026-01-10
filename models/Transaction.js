@@ -33,6 +33,9 @@ const TransactionSchema = new mongoose.Schema({
     },
     paymentId: { // For Stripe or other providers later
         type: String,
+    },
+    screenshot: {
+        type: String, // Base64 string of the payment screenshot
     }
 });
 
