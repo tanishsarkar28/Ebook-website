@@ -130,20 +130,14 @@ export default function AdminPage() {
         let coverImagePath = null;
 
         try {
-            // 1. Upload Image if selected
+            // 1. Process Image if selected (Base64 for Vercel compatibility)
             if (selectedFile) {
-                const formData = new FormData();
-                formData.append("file", selectedFile);
-
-                const res = await fetch("/api/upload", {
-                    method: "POST",
-                    body: formData
+                const reader = new FileReader();
+                coverImagePath = await new Promise((resolve, reject) => {
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsDataURL(selectedFile);
                 });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    coverImagePath = data.filepath;
-                }
             }
 
             const bookData = {
